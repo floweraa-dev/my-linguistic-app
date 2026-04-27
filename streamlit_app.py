@@ -1,61 +1,51 @@
 import streamlit as st
+import spacy
 from textblob import TextBlob
-from langdetect import detect, DetectorFactory
+from langdetect import detect
 
-# Чтобы результаты были стабильными
-DetectorFactory.seed = 0
+# Загружаем лингвистическую модель (бесплатно)
+@st.cache_resource
+def load_nlp():
+    return spacy.load("en_core_web_sm")
 
-st.set_page_config(page_title="Linguistic Analyzer", page_icon="📝")
+nlp = load_nlp()
 
-st.title("Linguistic & Sentiment Analyzer")
-st.write("Upload your essay or paste text below to analyze its complexity and tone.")
+st.title("Advanced Writing Assistant ✍️")
+st.write("Improve your academic English without expensive API keys.")
 
-# Поле для ввода
-user_text = st.text_area("Enter your text here:", height=200)
+user_input = st.text_area("Paste your essay here:", height=250)
 
-if st.button("Analyze Text"):
-    if user_text:
-        # 1. Определяем язык
-        try:
-            lang = detect(user_text)
-        except:
-            lang = "unknown"
+if st.button("Check Writing"):
+    if user_input:
+        lang = detect(user_input)
         
-        # 2. Базовые метрики (работают для всех языков)
-        word_count = len(user_text.split())
-        st.subheader("General Metrics")
-        col1, col2 = st.columns(2)
-        col1.metric("Word Count", word_count)
-        col2.metric("Detected Language", lang.upper())
-
-        # 3. Глубокий анализ для английского
         if lang == 'en':
-            blob = TextBlob(user_text)
+            doc = nlp(user_input)
+            blob = TextBlob(user_input)
             
-            st.subheader("Advanced English Analysis")
+            # 1. Поиск "слабых" слов (Overused Words)
+            weak_words = ["very", "good", "bad", "really", "thing", "stuff", "nice"]
+            found_weak = [token.text.lower() for token in doc if token.text.lower() in weak_words]
             
-            # Оценка тональности (Sentiment)
-            sentiment = blob.sentiment.polarity
-            if sentiment > 0.1:
-                st.info("Tone: Positive. This is great for motivational letters!")
-            elif sentiment < -0.1:
-                st.warning("Tone: Negative/Critical. Ensure this is intentional for your essay.")
+            st.subheader("Vocabulary Quality")
+            if found_weak:
+                st.warning(f"Found {len(found_weak)} overused words. Try to replace them with academic synonyms.")
+                st.write(f"Words to replace: {', '.join(set(found_weak))}")
             else:
-                st.write("Tone: Neutral/Objective.")
+                st.success("Your vocabulary looks strong and academic!")
 
-
-
-            # Сложность лексики (уникальные слова)
-            unique_words = len(set(blob.words.lower()))
-            lexical_richness = (unique_words / word_count) * 100 if word_count > 0 else 0
-            st.write(f"**Lexical Richness:** {lexical_richness:.1f}% unique words.")
+            # 2. Анализ сложности предложений
+            sentences = list(doc.sents)
+            avg_len = len(doc) / len(sentences)
             
-            if lexical_richness < 40:
-                st.error("Tip: Try to use more diverse vocabulary to avoid repetition.")
-            else:
-                st.success("Tip: Your vocabulary variety looks solid!")
+            st.subheader("Sentence Structure")
+            st.write(f"Average sentence length: {avg_len:.1f} words.")
+            if avg_len < 12:
+                st.info("Your sentences are quite short. For academic writing, try to use more complex structures.")
+            
+            # 3. Sentiment (Тональность)
+            st.subheader("Tone Analysis")
+            st.write(f"Objectivity score: {1 - blob.sentiment.subjectivity:.2f} (1.0 is very objective)")
 
         else:
-            st.warning("Detailed linguistic analysis (Sentiment/Complexity) is currently only available for English. For other languages, we only provide word counts.")
-    else:
-        st.error("Please enter some text first!")
+            st.error("Please use English for advanced analysis.")
