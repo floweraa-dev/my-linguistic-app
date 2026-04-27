@@ -41,7 +41,8 @@ if st.button("Analyze Text"):
             elif sentiment < -0.1:
                 st.warning("Tone: Negative/Critical. Ensure this is intentional for your essay.")
             else:
-                st.secondary("Tone: Neutral/Objective.")
+                st.write("Tone: Neutral/Objective.")
+
 
 
             # Сложность лексики (уникальные слова)
