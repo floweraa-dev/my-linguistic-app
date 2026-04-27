@@ -43,6 +43,7 @@ if st.button("Analyze Text"):
             else:
                 st.secondary("Tone: Neutral/Objective.")
 
+
             # Сложность лексики (уникальные слова)
             unique_words = len(set(blob.words.lower()))
             lexical_richness = (unique_words / word_count) * 100 if word_count > 0 else 0
