@@ -1,95 +1,75 @@
 import streamlit as st
 from textblob import TextBlob
 from langdetect import detect
-import re
 
-st.set_page_config(page_title="IELTS Writing Assistant", page_icon="🎓", layout="wide")
+st.set_page_config(page_title="IELTS Writing Checker", page_icon="🎓")
 
-# Словарь для улучшения лексики (Simple -> Academic)
-VOCAB_UPGRADE = {
-    "good": ["beneficial", "advantageous", "exemplary"],
-    "bad": ["detrimental", "adverse", "substandard"],
-    "very": ["extremely", "considerably", "profoundly"],
-    "think": ["assert", "believe", "maintain", "opine"],
-    "important": ["crucial", "pivotal", "imperative", "paramount"],
-    "big": ["substantial", "significant", "vast"],
-    "small": ["minuscule", "negligible", "marginal"]
-}
+# Боковая панель с критериями
+st.sidebar.title("IELTS Criteria")
+st.sidebar.info("""
+**1. Task Response:** Did you answer the question?
+**2. Coherence:** Are your ideas connected?
+**3. Lexical Resource:** Is your vocabulary varied?
+**4. Grammar Range:** Are your sentences complex?
+""")
 
-def analyze_ielts(text):
-    blob = TextBlob(text)
-    words = text.lower().split()
-    word_count = len(words)
-    unique_words = len(set(words))
-    
-    # 1. Lexical Resource (Словарный запас)
-    lex_score = (unique_words / word_count * 10) if word_count > 0 else 0
-    
-    # 2. Coherence (Длина предложений)
-    sentences = text.split('.')
-    avg_sent_len = word_count / len(sentences) if len(sentences) > 0 else 0
-    coh_score = 9 if 15 < avg_sent_len < 25 else 6
-    
-    return {
-        "word_count": word_count,
-        "lex_score": min(9.0, lex_score),
-        "coh_score": coh_score,
-        "sentiment": blob.sentiment.polarity
-    }
+st.title("IELTS Academic Writing Assistant ✍️")
+st.write("Paste your Task 2 essay below to check your Lexical Resource and Sentiment.")
 
-st.title("🎓 IELTS Writing Grader & Optimizer")
-st.markdown("---")
+# Поле для ввода
+essay = st.text_area("Your Essay:", height=300, placeholder="Write at least 250 words...")
 
-# Интерфейс с колонками
-col_input, col_results = st.columns([2, 1])
+# Списки слов для проверки вокабуляра
+academic_words = ['furthermore', 'nevertheless', 'consequently', 'subsequently', 'moreover', 'illustrated', 'significant', 'prevalent']
+filler_words = ['very', 'good', 'bad', 'really', 'big', 'small']
 
-with col_input:
-    user_text = st.text_area("Paste your IELTS Essay here:", height=350, placeholder="In today's world, it is often argued that...")
-    
-    if st.button("🚀 Run Deep Analysis"):
-        if user_text:
-            try:
-                if detect(user_text) != 'en':
-                    st.warning("Please write in English for accurate IELTS grading.")
+if st.button("Check My Essay"):
+    if essay:
+        try:
+            lang = detect(essay)
+            if lang != 'en':
+                st.error("Please provide text in English for IELTS analysis.")
+            else:
+                word_count = len(essay.split())
+                blob = TextBlob(essay)
+                
+                # Основные показатели
+                col1, col2, col3 = st.columns(3)
+                col1.metric("Word Count", word_count)
+                
+                # Процент уникальных слов (Lexical Resource)
+                unique_words = len(set(blob.words.lower()))
+                lex_richness = (unique_words / word_count) * 100 if word_count > 0 else 0
+                col2.metric("Lexical Variety", f"{lex_richness:.1f}%")
+                
+                # Тональность (для IELTS обычно должна быть нейтральной)
+                sentiment = blob.sentiment.polarity
+                col3.metric("Objectivity", "High" if -0.2 < sentiment < 0.2 else "Low")
+
+                st.divider()
+
+                # Анализ вокабуляра
+                st.subheader("Vocabulary & Cohesion Analysis")
+                
+                # Проверка на Academic Linking Words
+                found_academic = [w for w in academic_words if w in essay.lower()]
+                if found_academic:
+                    st.success(f"✅ Good use of linking words: {', '.join(found_academic)}")
                 else:
-                    results = analyze_ielts(user_text)
-                    
-                    # Вкладки для результатов
-                    tab1, tab2, tab3 = st.tabs(["📊 Score Estimation", "vocabulary_fix" "🔍 Vocabulary Fix", "💡 Tips"])
-                    
-                    with tab1:
-                        st.subheader("Estimated Band Score")
-                        c1, c2, c3 = st.columns(3)
-                        c1.metric("Lexical Resource", f"{results['lex_score']:.1;}")
-                        c2.metric("Coherence", f"{results['coh_score']}.0")
-                        c3.metric("Word Count", results['word_count'])
-                        
-                        if results['word_count'] < 250:
-                            st.error("Warning: Task 2 essays must be at least 250 words!")
+                    st.warning("⚠️ Try using more formal linkers (e.g., 'Furthermore', 'Consequently').")
 
-                    with tab2:
-                        st.subheader("Word Upgrades")
-                        found_simple = False
-                        for simple, better in VOCAB_UPGRADE.items():
-                            if re.search(rf"\b{simple}\b", user_text.lower()):
-                                st.write(f"❌ Don't use **'{simple}'**. Try: {', '.join([f'*{b}*' for b in better])}")
-                                found_simple = True
-                        if not found_simple:
-                            st.success("No basic words found. Your vocabulary is sophisticated!")
+                # Проверка на "слабые" слова
+                found_fillers = [w for w in filler_words if w in essay.lower()]
+                if found_fillers:
+                    st.error(f"❌ Avoid 'weak' words: {', '.join(set(found_fillers))}. Use more precise synonyms.")
 
-                    with tab3:
-                        st.subheader("Personalized Tips")
-                        if results['sentiment'] > 0.5:
-                            st.info("Your essay is very positive. For IELTS, try to maintain a more academic, neutral tone.")
-                        if results['coh_score'] < 7:
-                            st.write("- Your sentences might be too short. Try using connectors like *'Furthermore'*, *'However'*, or *'Consequently'*.")
+                # Вердикт по объему
+                if word_count < 250:
+                    st.error(f"Warning: Your essay is only {word_count} words. You need at least 250 words for Task 2.")
+                else:
+                    st.success("Word count is sufficient for Task 2.")
 
-            except Exception as e:
-                st.error(f"Error analyzing text: {e}")
-        else:
-            st.error("Text area is empty!")
-
-with col_results:
-    st.sidebar.title("Project Info")
-    st.sidebar.info("This tool uses Natural Language Processing (NLP) to help students prepare for TOEFL/IELTS exams.")
-    [span_1](start_span)st.sidebar.write(f"Target Score: 1400 (SAT Equiv.)")[span_1](end_span)
+        except:
+            st.error("Could not analyze the text. Please try again.")
+    else:
+        st.info("Please paste your essay to start the analysis.")
